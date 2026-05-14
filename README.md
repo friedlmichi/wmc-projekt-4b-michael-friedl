@@ -1,2 +1,2 @@
 # wmc-projekt-4b-michael-friedl
-WMC Projekt
+WMC Projekt Pollenradar
