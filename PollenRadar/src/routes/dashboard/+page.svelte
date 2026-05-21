@@ -25,13 +25,9 @@
     <div class="main-content">
         <header class="dashboard-header">
             <h1>Willkommen, {auth.user?.first_name || 'Nutzer'}</h1>
-            <p class="text-muted">Hier ist dein persönliches PollenRadar Dashboard.</p>
         </header>
 
         <div class="card empty-state">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">👋</div>
-            <h2>Dein Dashboard ist einsatzbereit!</h2>
-            <p class="text-muted">In den nächsten Meilensteinen werden hier die Pollendaten angezeigt.</p>
             
             <div class="profile-summary">
                 <p><strong>Deine Allergien:</strong> 
