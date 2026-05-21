@@ -1,11 +1,38 @@
 <script>
-	import favicon from '$lib/assets/favicon.svg';
+    import '../app.css';
+    import { auth } from '$lib/state/auth.svelte.js';
+    import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
 
-	let { children } = $props();
+    let { children } = $props();
+
+    onMount(() => {
+        // Simple client-side route guard
+        const currentPath = $page.url.pathname;
+        let isAuthRoute = false;
+        
+        if (currentPath === '/login' || currentPath === '/register') {
+            isAuthRoute = true;
+        }
+
+        if (!auth.isInitialized) {
+            auth.init();
+        }
+
+        if (!auth.token && !isAuthRoute) {
+            goto('/login');
+        } else if (auth.token && isAuthRoute) {
+            // Already logged in
+            goto('/dashboard');
+        }
+    });
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+    <title>PollenRadar</title>
 </svelte:head>
 
-{@render children()}
+<main>
+    {@render children()}
+</main>
