@@ -28,7 +28,7 @@
 <div class="auth-container">
     <div class="auth-card">
         <h1 class="text-center">Login</h1>
-        <p class="text-center text-muted mb-4">Zurück bei PollenRadar</p>
+
 
         <form onsubmit={handleSubmit}>
             <div class="form-group">

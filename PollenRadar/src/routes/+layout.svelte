@@ -8,7 +8,6 @@
     let { children } = $props();
 
     onMount(() => {
-        // Simple client-side route guard
         const currentPath = $page.url.pathname;
         let isAuthRoute = false;
         
@@ -23,7 +22,7 @@
         if (!auth.token && !isAuthRoute) {
             goto('/login');
         } else if (auth.token && isAuthRoute) {
-            // Already logged in
+
             goto('/dashboard');
         }
     });
