@@ -30,7 +30,6 @@
 <div class="auth-container">
     <div class="auth-card">
         <h1 class="text-center">Registrierung</h1>
-        <p class="text-center text-muted mb-4">Willkommen bei PollenRadar</p>
 
         <form onsubmit={handleSubmit}>
             <div class="form-group">
