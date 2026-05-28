@@ -3,7 +3,7 @@ const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
-const { RegisterDTO, LoginDTO, OnboardingDTO, UserResponseDTO } = require('./dtos');
+const { RegisterDTO, LoginDTO, OnboardingDTO, UserResponseDTO, SymptomLogDTO } = require('./dtos');
 
 const app = express();
 app.use(cors());
@@ -139,6 +139,99 @@ app.get('/api/user', authenticateToken, (req, res) => {
         const userResponse = new UserResponseDTO(row);
         return res.json({ user: userResponse });
     });
+});
+
+
+
+app.get('/api/pollen', async (req, res) => {
+    const { lat, lon } = req.query;
+    
+    if (!lat || !lon) {
+        return res.status(400).json({ error: 'Latitude and longitude are required' });
+    }
+    
+    try {
+        const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen&timezone=auto`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch from Open-Meteo');
+        }
+        
+        const data = await response.json();
+        return res.json(data);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Failed to fetch pollen data' });
+    }
+});
+
+app.post('/api/diary', authenticateToken, (req, res) => {
+    const symptomLog = new SymptomLogDTO(req.body);
+    
+    if (!symptomLog.isValid()) {
+        return res.status(400).json({ error: 'Invalid symptom data' });
+    }
+    
+    const symptomsJson = JSON.stringify(symptomLog.symptoms);
+    
+    db.run(
+        `INSERT INTO symptom_logs (user_id, date, symptoms, notes) VALUES (?, ?, ?, ?)`,
+        [req.user.id, symptomLog.date, symptomsJson, symptomLog.notes],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: 'Failed to save diary entry' });
+            }
+            return res.status(201).json({ success: true, id: this.lastID });
+        }
+    );
+});
+
+app.get('/api/diary', authenticateToken, (req, res) => {
+    db.all(
+        `SELECT * FROM symptom_logs WHERE user_id = ? ORDER BY date DESC`,
+        [req.user.id],
+        (err, rows) => {
+            if (err) {
+                return res.status(500).json({ error: 'Failed to fetch diary entries' });
+            }
+            
+            const entries = rows.map(row => {
+                let parsedSymptoms = [];
+                try {
+                    parsedSymptoms = JSON.parse(row.symptoms);
+                } catch (e) {
+                    parsedSymptoms = [];
+                }
+                return {
+                    id: row.id,
+                    date: row.date,
+                    symptoms: parsedSymptoms,
+                    notes: row.notes || ''
+                };
+            });
+            
+            return res.json(entries);
+        }
+    );
+});
+
+app.delete('/api/diary/:id', authenticateToken, (req, res) => {
+    const entryId = req.params.id;
+    
+    db.run(
+        `DELETE FROM symptom_logs WHERE id = ? AND user_id = ?`,
+        [entryId, req.user.id],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: 'Failed to delete diary entry' });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'Entry not found or unauthorized' });
+            }
+            return res.json({ success: true });
+        }
+    );
 });
 
 app.listen(PORT, () => {
