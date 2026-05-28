@@ -69,9 +69,31 @@ class UserResponseDTO {
     }
 }
 
+class SymptomLogDTO {
+    constructor(data) {
+        this.symptoms = data.symptoms; // Expected to be an array of strings
+        this.notes = data.notes || '';
+        this.date = data.date || new Date().toISOString();
+    }
+
+    isValid() {
+        if (!this.symptoms) {
+            return false;
+        }
+        if (!Array.isArray(this.symptoms)) {
+            return false;
+        }
+        if (this.symptoms.length === 0) {
+            return false;
+        }
+        return true;
+    }
+}
+
 module.exports = {
     RegisterDTO,
     LoginDTO,
     OnboardingDTO,
-    UserResponseDTO
+    UserResponseDTO,
+    SymptomLogDTO
 };

@@ -21,6 +21,22 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 console.error('Error creating users table', err.message);
             }
         });
+
+        db.run(`DROP TABLE IF EXISTS symptom_logs`, (err) => {
+            if (err) console.error(err);
+            db.run(`CREATE TABLE symptom_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                symptoms TEXT NOT NULL,
+                notes TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Error creating symptom_logs table', err.message);
+                }
+            });
+        });
     }
 });
 
