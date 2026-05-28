@@ -1,11 +1,12 @@
 <script>
     import { updateOnboarding } from '$lib/api.js';
     import { auth } from '$lib/state/auth.svelte.js';
-    import { goto } from '$app/navigation';
+    import { onMount } from 'svelte';
 
     let allergens = $state([]);
     let gpsEnabled = $state(false);
     let errorMsg = $state('');
+    let successMsg = $state('');
     let isLoading = $state(false);
 
     const availableAllergens = [
@@ -17,6 +18,13 @@
         'Ragweed'
     ];
 
+    onMount(() => {
+        if (auth.user) {
+            allergens = [...(auth.user.allergens || [])];
+            gpsEnabled = !!auth.user.gps_enabled;
+        }
+    });
+
     function toggleAllergen(allergen) {
         const index = allergens.indexOf(allergen);
         if (index > -1) {
@@ -26,29 +34,32 @@
         }
     }
 
-    async function handleSubmit(event) {
+    async function handleSave(event) {
         event.preventDefault();
         errorMsg = '';
+        successMsg = '';
         isLoading = true;
 
         try {
             const data = await updateOnboarding(allergens, gpsEnabled);
             auth.updateUser(data.user);
-            goto('/dashboard');
+            successMsg = 'Profil erfolgreich aktualisiert!';
         } catch (err) {
-            errorMsg = err.message;
+            errorMsg = err.message || 'Fehler beim Speichern.';
         } finally {
             isLoading = false;
         }
     }
 </script>
 
-<div class="auth-container">
-    <div class="auth-card" style="max-width: 500px;">
-        <h1 class="text-center">Willkommen, {auth.user?.first_name || 'Nutzer'}!</h1>
-        <p class="text-center text-muted mb-4">Lass uns dein Profil einrichten, um dir die besten Pollen-Daten zu liefern.</p>
+<div class="profile-container">
+    <header class="mb-4">
+        <h1>Mein Profil</h1>
+        <p class="text-muted">Verwalte deine Allergien und Einstellungen.</p>
+    </header>
 
-        <form onsubmit={handleSubmit}>
+    <div class="card">
+        <form onsubmit={handleSave}>
             <div class="form-group mb-4">
                 <label>Gegen was bist du allergisch?</label>
                 <div class="allergens-grid">
@@ -78,17 +89,20 @@
                 <label for="gps_toggle" style="margin-bottom: 0;">GPS-Standort aktivieren</label>
                 <input type="checkbox" id="gps_toggle" bind:checked={gpsEnabled} />
             </div>
-            <p class="text-muted" style="font-size: 0.85rem;">Wir benötigen deinen Standort, um genaue lokale Pollendaten anzuzeigen.</p>
+            <p class="text-muted mb-4" style="font-size: 0.85rem;">Wird benötigt, um genaue lokale Pollendaten anzuzeigen.</p>
 
             {#if errorMsg}
-                <div class="error-msg">{errorMsg}</div>
+                <div class="error-msg mb-4">{errorMsg}</div>
+            {/if}
+            {#if successMsg}
+                <div class="success-msg mb-4">{successMsg}</div>
             {/if}
 
-            <button type="submit" class="btn btn-primary w-full mt-4" disabled={isLoading}>
+            <button type="submit" class="btn btn-primary w-full" disabled={isLoading}>
                 {#if isLoading}
                     Speichere...
                 {:else}
-                    Einrichtung abschließen
+                    Änderungen speichern
                 {/if}
             </button>
         </form>
@@ -96,6 +110,10 @@
 </div>
 
 <style>
+    .profile-container {
+        max-width: 600px;
+    }
+
     .allergens-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -127,7 +145,6 @@
         padding: 1rem;
         background: var(--background);
         border-radius: var(--radius-sm);
-        margin-top: 1rem;
     }
 
     input[type="checkbox"] {
@@ -135,5 +152,13 @@
         height: 1.25rem;
         accent-color: var(--primary);
         cursor: pointer;
+    }
+
+    .success-msg {
+        color: #065f46;
+        background-color: #d1fae5;
+        padding: 0.75rem;
+        border-radius: var(--radius-sm);
+        text-align: center;
     }
 </style>
