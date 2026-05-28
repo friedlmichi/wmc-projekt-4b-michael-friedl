@@ -62,3 +62,19 @@ export async function updateOnboarding(allergens, gps_enabled) {
 export async function getUser() {
     return await apiCall('/user', 'GET');
 }
+
+export async function getPollenData(lat, lon) {
+    return await apiCall(`/pollen?lat=${lat}&lon=${lon}`, 'GET');
+}
+
+export async function saveDiaryEntry(symptoms, notes = '') {
+    return await apiCall('/diary', 'POST', { symptoms, notes });
+}
+
+export async function getDiaryEntries() {
+    return await apiCall('/diary', 'GET');
+}
+
+export async function deleteDiaryEntry(id) {
+    return await apiCall(`/diary/${id}`, 'DELETE');
+}
