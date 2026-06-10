@@ -1,16 +1,26 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const db = require('./db');
 const { RegisterDTO, LoginDTO, OnboardingDTO, UserResponseDTO, SymptomLogDTO } = require('./dtos');
+
+const http = require('http');
+const { WebSocketServer } = require('ws');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
 const JWT_SECRET = 'super-secret-key-for-pollenradar-milestone-2';
 const PORT = 3000;
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -112,9 +122,11 @@ app.put('/api/onboarding', authenticateToken, (req, res) => {
         gpsEnabledInt = 1;
     }
     
+    const lang = onboardingDto.language || 'de';
+
     db.run(
-        `UPDATE users SET allergens = ?, gps_enabled = ? WHERE id = ?`,
-        [allergensJson, gpsEnabledInt, req.user.id],
+        `UPDATE users SET allergens = ?, gps_enabled = ?, language = ? WHERE id = ?`,
+        [allergensJson, gpsEnabledInt, lang, req.user.id],
         function(err) {
             if (err) {
                 return res.status(500).json({ error: 'Failed to update user onboarding data.' });
@@ -234,6 +246,150 @@ app.delete('/api/diary/:id', authenticateToken, (req, res) => {
     );
 });
 
-app.listen(PORT, () => {
+app.post('/api/chat', authenticateToken, (req, res) => {
+    const userMessage = req.body.message;
+    const lang = req.body.language || 'de';
+    if (!userMessage) return res.status(400).json({ error: 'Message is required' });
+
+    db.all(
+        `SELECT date, symptoms, notes FROM symptom_logs WHERE user_id = ? ORDER BY date ASC`,
+        [req.user.id],
+        async (err, rows) => {
+            if (err) return res.status(500).json({ error: 'Failed to fetch logs for chat' });
+
+            let logText = rows.map(r => {
+                let symps = [];
+                try { symps = JSON.parse(r.symptoms); } catch (e) {}
+                const dateStr = new Date(r.date).toLocaleString('de-DE');
+                return `Am ${dateStr}: Symptome: ${symps.join(', ')}. Notizen: ${r.notes || 'Keine'}`;
+            }).join('\n');
+
+            if (!logText) logText = lang === 'en' ? "The user has no diary entries yet." : "Der Nutzer hat noch keine Tagebucheinträge vorgenommen.";
+
+            let systemPrompt = `Du bist ein hilfsbereiter KI-Assistent für die App 'PollenRadar'. Deine Aufgabe ist es, dem Nutzer basierend auf seinem Symptom-Tagebuch Ratschläge, Vermutungen oder Zusammenfassungen zu geben.
+Hier ist das bisherige Symptom-Tagebuch des Nutzers:
+${logText}
+
+WICHTIG: Antworte extrem kurz, stichwortartig, prägnant und direkt auf den Punkt. Vermeide lange Floskeln oder Einleitungen. Nutze Bulletpoints für Ratschläge.
+Weise ganz kurz darauf hin, dass du kein Arzt bist und dies keine medizinische Diagnose ist.`;
+
+            if (lang === 'en') {
+                systemPrompt = `You are a helpful AI assistant for the app 'PollenRadar'. Your task is to give the user advice, hypotheses, or summaries based on their symptom diary.
+Here is the user's symptom diary so far:
+${logText}
+
+IMPORTANT: Answer extremely short, in bullet points, concise, and directly to the point. Avoid long pleasantries or introductions. Use bullet points for advice.
+Briefly state that you are not a doctor and this is not a medical diagnosis.`;
+            }
+
+            try {
+                const model = genAI.getGenerativeModel({
+                    model: "gemini-2.5-flash",
+                    systemInstruction: systemPrompt
+                });
+                const result = await model.generateContent(userMessage);
+                const response = await result.response;
+                const replyText = response.text();
+                return res.json({ reply: replyText });
+            } catch (aiErr) {
+                console.error("Gemini SDK Error:", aiErr);
+                return res.status(500).json({ error: 'KI-Fehler: ' + (aiErr.message || 'Unbekannt') });
+            }
+        }
+    );
+});
+
+// WebSocket Server Logic for Chat
+wss.on('connection', (ws) => {
+    console.log('New WebSocket connection established.');
+
+    ws.on('message', async (messageData) => {
+        try {
+            const data = JSON.parse(messageData);
+            const { token, message, language } = data;
+            const lang = language || 'de';
+
+            if (!token) {
+                ws.send(JSON.stringify({ error: 'Access token required' }));
+                return;
+            }
+            if (!message) {
+                ws.send(JSON.stringify({ error: 'Message is required' }));
+                return;
+            }
+
+            jwt.verify(token, JWT_SECRET, (err, decodedUser) => {
+                if (err) {
+                    ws.send(JSON.stringify({ error: 'Invalid token' }));
+                    return;
+                }
+
+                const userId = decodedUser.id;
+
+                db.all(
+                    `SELECT date, symptoms, notes FROM symptom_logs WHERE user_id = ? ORDER BY date ASC`,
+                    [userId],
+                    async (dbErr, rows) => {
+                        if (dbErr) {
+                            ws.send(JSON.stringify({ error: 'Failed to fetch logs' }));
+                            return;
+                        }
+
+                        let logText = rows.map(r => {
+                            let symps = [];
+                            try { symps = JSON.parse(r.symptoms); } catch (e) {}
+                            const dateStr = new Date(r.date).toLocaleString('de-DE');
+                            return `Am ${dateStr}: Symptome: ${symps.join(', ')}. Notizen: ${r.notes || 'Keine'}`;
+                        }).join('\n');
+
+                        if (!logText) {
+                            logText = lang === 'en' ? "The user has no diary entries yet." : "Der Nutzer hat noch keine Tagebucheinträge vorgenommen.";
+                        }
+
+                        let systemPrompt = `Du bist ein hilfsbereiter KI-Assistent für die App 'PollenRadar'. Deine Aufgabe ist es, dem Nutzer basierend auf seinem Symptom-Tagebuch Ratschläge, Vermutungen oder Zusammenfassungen zu geben.
+Hier ist das bisherige Symptom-Tagebuch des Nutzers:
+${logText}
+
+WICHTIG: Antworte extrem kurz, stichwortartig, prägnant und direkt auf den Punkt. Vermeide lange Floskeln oder Einleitungen. Nutze Bulletpoints für Ratschläge.
+Weise ganz kurz darauf hin, dass du kein Arzt bist und dies keine medizinische Diagnose ist.`;
+
+                        if (lang === 'en') {
+                            systemPrompt = `You are a helpful AI assistant for the app 'PollenRadar'. Your task is to give the user advice, hypotheses, or summaries based on their symptom diary.
+Here is the user's symptom diary so far:
+${logText}
+
+IMPORTANT: Answer extremely short, in bullet points, concise, and directly to the point. Avoid long pleasantries or introductions. Use bullet points for advice.
+Briefly state that you are not a doctor and this is not a medical diagnosis.`;
+                        }
+
+                        try {
+                            const model = genAI.getGenerativeModel({
+                                model: "gemini-2.5-flash",
+                                systemInstruction: systemPrompt
+                            });
+                            const result = await model.generateContent(message);
+                            const response = await result.response;
+                            const replyText = response.text();
+
+                            ws.send(JSON.stringify({ reply: replyText }));
+                        } catch (aiErr) {
+                            console.error("Gemini WebSocket Error:", aiErr);
+                            ws.send(JSON.stringify({ error: 'KI-Fehler: ' + (aiErr.message || 'Unbekannt') }));
+                        }
+                    }
+                );
+            });
+        } catch (parseErr) {
+            console.error("WebSocket message parsing error:", parseErr);
+            ws.send(JSON.stringify({ error: 'Invalid message format' }));
+        }
+    });
+
+    ws.on('close', () => {
+        console.log('WebSocket connection closed.');
+    });
+});
+
+server.listen(PORT, () => {
     console.log(`Backend server running on http://localhost:${PORT}`);
 });
