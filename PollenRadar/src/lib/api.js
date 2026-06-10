@@ -52,11 +52,8 @@ export async function login(email, password) {
     });
 }
 
-export async function updateOnboarding(allergens, gps_enabled) {
-    return await apiCall('/onboarding', 'PUT', {
-        allergens,
-        gps_enabled
-    });
+export async function updateOnboarding(allergens, gpsEnabled, language = 'de') {
+    return await apiCall('/onboarding', 'PUT', { allergens, gps_enabled: gpsEnabled, language });
 }
 
 export async function getUser() {
@@ -77,4 +74,8 @@ export async function getDiaryEntries() {
 
 export async function deleteDiaryEntry(id) {
     return await apiCall(`/diary/${id}`, 'DELETE');
+}
+
+export async function sendChatMessage(message, language = 'de') {
+    return await apiCall('/chat', 'POST', { message, language });
 }
