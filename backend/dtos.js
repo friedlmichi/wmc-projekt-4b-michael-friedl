@@ -45,6 +45,7 @@ class OnboardingDTO {
     constructor(data) {
         this.allergens = data.allergens; 
         this.gps_enabled = data.gps_enabled; 
+        this.language = data.language || 'de';
     }
 }
 
@@ -66,6 +67,8 @@ class UserResponseDTO {
         } else {
             this.gps_enabled = false;
         }
+
+        this.language = userRow.language || 'de';
     }
 }
 

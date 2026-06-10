@@ -15,27 +15,27 @@ const db = new sqlite3.Database(dbPath, (err) => {
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
             allergens TEXT,
-            gps_enabled INTEGER DEFAULT 0
+            gps_enabled INTEGER DEFAULT 0,
+            language TEXT DEFAULT 'de'
         )`, (err) => {
             if (err) {
                 console.error('Error creating users table', err.message);
+            } else {
+                db.run(`ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'de'`, () => {});
             }
         });
 
-        db.run(`DROP TABLE IF EXISTS symptom_logs`, (err) => {
-            if (err) console.error(err);
-            db.run(`CREATE TABLE symptom_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                date TEXT NOT NULL,
-                symptoms TEXT NOT NULL,
-                notes TEXT,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )`, (err) => {
-                if (err) {
-                    console.error('Error creating symptom_logs table', err.message);
-                }
-            });
+        db.run(`CREATE TABLE IF NOT EXISTS symptom_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            symptoms TEXT NOT NULL,
+            notes TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )`, (err) => {
+            if (err) {
+                console.error('Error creating symptom_logs table', err.message);
+            }
         });
     }
 });
