@@ -1,0 +1,19 @@
+# Ignore node_modules in any directory
+node_modules/
+
+# SvelteKit output
+PollenRadar/.svelte-kit/
+PollenRadar/build/
+PollenRadar/.output/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# SQLite database (optional, but keep database.sqlite if it's already tracked)
+# backend/database.sqlite
