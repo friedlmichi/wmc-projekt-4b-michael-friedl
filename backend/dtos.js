@@ -74,7 +74,7 @@ class UserResponseDTO {
 
 class SymptomLogDTO {
     constructor(data) {
-        this.symptoms = data.symptoms; // Expected to be an array of strings
+        this.symptoms = data.symptoms; 
         this.notes = data.notes || '';
         this.date = data.date || new Date().toISOString();
     }
