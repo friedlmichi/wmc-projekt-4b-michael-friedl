@@ -1,6 +1,8 @@
 <script>
     import { getPollenData } from '$lib/api.js';
+    import { i18n } from '$lib/state/i18n.svelte.js';
     import { onMount } from 'svelte';
+    import Badge from '$lib/components/Badge.svelte';
 
     let cityQuery = $state('');
     let isSearching = $state(false);
@@ -15,6 +17,15 @@
         'Erle': 'alder_pollen',
         'Olive': 'olive_pollen',
         'Ragweed': 'ragweed_pollen'
+    };
+
+    const allergenI18nMap = {
+        'Birke': 'allergen.birch',
+        'Gräser': 'allergen.grass',
+        'Beifuß': 'allergen.mugwort',
+        'Erle': 'allergen.alder',
+        'Olive': 'allergen.olive',
+        'Ragweed': 'allergen.ragweed'
     };
 
     onMount(() => {
@@ -40,7 +51,7 @@
                 currentLocationName = geoData[0].display_name.split(',')[0];
                 await fetchForecastForCoordinates(lat, lon, currentLocationName);
             } else {
-                errorMsg = 'Stadt nicht gefunden.';
+                errorMsg = i18n.t('calendar.err_not_found');
             }
         } catch (err) {
             errorMsg = 'Fehler bei der Städtesuche.';
@@ -95,8 +106,8 @@
 
 <div class="calendar-container">
     <header class="mb-4">
-        <h1>Pollen-Kalender</h1>
-        <p class="text-muted">7-Tage-Prognose für deine Region oder dein Reiseziel.</p>
+        <h1>{i18n.t('calendar.title')}</h1>
+        <p class="text-muted">{i18n.t('calendar.subtitle')}</p>
     </header>
 
     <div class="card search-card">
@@ -104,14 +115,14 @@
             <input 
                 type="text" 
                 bind:value={cityQuery} 
-                placeholder="Stadt suchen (z.B. Berlin, Linz)" 
+                placeholder={i18n.t('calendar.search_placeholder')} 
                 class="search-input"
             />
             <button type="submit" class="btn btn-primary" disabled={isSearching}>
                 {#if isSearching}
-                    Sucht...
+                    {i18n.t('calendar.searching_btn')}
                 {:else}
-                    Suchen
+                    {i18n.t('calendar.search_btn')}
                 {/if}
             </button>
         </form>
@@ -121,29 +132,29 @@
     </div>
 
     <div class="legend-card card mb-4">
-        <h3>Legende</h3>
+        <h3>{i18n.t('calendar.legend.title')}</h3>
         <p class="text-muted" style="margin-bottom: 0.5rem; font-size: 0.9rem;">Die Zahlen geben die Pollenbelastung in <strong>Partikeln pro Kubikmeter (m³)</strong> an.</p>
         <div class="legend-items">
             <div class="legend-item">
                 <span class="badge low">0 - 9</span>
-                <span>Gering</span>
+                <span>{i18n.t('calendar.legend.low')}</span>
             </div>
             <div class="legend-item">
                 <span class="badge moderate">10 - 49</span>
-                <span>Mittel</span>
+                <span>{i18n.t('calendar.legend.mod')}</span>
             </div>
             <div class="legend-item">
                 <span class="badge high">50+</span>
-                <span>Hoch</span>
+                <span>{i18n.t('calendar.legend.high')}</span>
             </div>
         </div>
     </div>
 
     <h2 class="mt-4 mb-4">
         {#if isSearching}
-            Suche Daten für "{cityQuery}"...
+            ...
         {:else}
-            Prognose für {currentLocationName}
+            {i18n.t('calendar.forecast_for')} {currentLocationName}
         {/if}
     </h2>
 
@@ -152,16 +163,14 @@
             {#each forecastData as day}
                 <div class="forecast-card card">
                     <div class="date-header">
-                        <strong>{new Date(day.date).toLocaleDateString('de-DE', { weekday: 'short' })}</strong>
-                        <div class="date-sub">{new Date(day.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</div>
+                        <strong>{new Date(day.date).toLocaleDateString(i18n.lang === 'en' ? 'en-US' : 'de-DE', { weekday: 'short' })}</strong>
+                        <div class="date-sub">{new Date(day.date).toLocaleDateString(i18n.lang === 'en' ? 'en-US' : 'de-DE', { day: '2-digit', month: '2-digit' })}</div>
                     </div>
                     <div class="data-rows">
                         {#each Object.keys(day.pollens) as pollenKey}
                             <div class="pollen-stat">
-                                <span class="pollen-name">{pollenKey}:</span>
-                                <span class="badge {getLevelClass(day.pollens[pollenKey])}">
-                                    {Math.round(day.pollens[pollenKey])}
-                                </span>
+                                <span class="pollen-name">{i18n.t(allergenI18nMap[pollenKey] || pollenKey)}:</span>
+                                <Badge value={day.pollens[pollenKey]} />
                             </div>
                         {/each}
                     </div>
@@ -169,18 +178,18 @@
             {/each}
         </div>
     {:else if !errorMsg && !isSearching}
-        <p>Lade Prognose...</p>
+        <p>...</p>
     {/if}
 </div>
 
 <style>
     .calendar-container {
-        max-width: 800px;
+        width: 100%;
+        max-width: 100%;
     }
 
     .search-card {
-        background: var(--surface);
-        padding: 1.5rem;
+        margin-bottom: 1.5rem;
     }
 
     .search-form {
@@ -188,103 +197,100 @@
         gap: 1rem;
     }
 
-    .search-input {
-        flex: 1;
-        padding: 0.75rem 1rem;
-        border: 1px solid var(--border);
-        border-radius: var(--radius-sm);
-        font-family: var(--font-family);
-        font-size: 1rem;
-    }
-
-    .legend-card {
-        background: var(--surface);
-        padding: 1rem 1.5rem;
-    }
-
     .legend-card h3 {
         margin-top: 0;
-        margin-bottom: 0.5rem;
-        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+        font-size: 1.15rem;
+        color: var(--text-main);
     }
 
     .legend-items {
         display: flex;
         gap: 1.5rem;
         flex-wrap: wrap;
+        margin-top: 1rem;
     }
 
     .legend-item {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        font-size: 0.9rem;
+        gap: 0.75rem;
+        font-size: 0.95rem;
     }
 
     .forecast-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 1.5rem;
     }
 
     .forecast-card {
         display: flex;
         flex-direction: column;
-        padding: 1rem;
+        padding: 1.5rem 1.25rem;
         text-align: center;
         margin-bottom: 0;
+        transition: var(--transition-smooth);
+    }
+
+    .forecast-card:hover {
+        transform: translateY(-4px);
     }
 
     .date-header {
-        font-size: 1.1rem;
+        font-size: 1.15rem;
         color: var(--text-main);
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid var(--border);
-        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1.5px solid var(--border);
+        margin-bottom: 1rem;
     }
 
     .date-sub {
-        font-size: 0.85rem;
+        font-size: 0.875rem;
         color: var(--text-muted);
         font-weight: normal;
+        margin-top: 0.125rem;
     }
 
     .data-rows {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
+        gap: 0.875rem;
     }
 
     .pollen-stat {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-size: 0.9rem;
+        font-size: 0.925rem;
     }
 
     .pollen-name {
         color: var(--text-muted);
+        font-weight: 500;
     }
 
     .badge {
-        padding: 0.25rem 0.75rem;
+        padding: 0.25rem 0.65rem;
         border-radius: 9999px;
-        font-weight: 600;
-        font-size: 0.875rem;
+        font-weight: 700;
+        font-size: 0.80rem;
+        min-width: 2.25rem;
+        text-align: center;
     }
 
     .badge.low {
-        background-color: #d1fae5;
-        color: #065f46;
+        background-color: rgba(22, 163, 74, 0.12);
+        color: #15803d;
     }
 
     .badge.moderate {
-        background-color: #fef3c7;
-        color: #92400e;
+        background-color: rgba(234, 88, 12, 0.12);
+        color: #c2410c;
     }
 
     .badge.high {
-        background-color: #fee2e2;
-        color: #991b1b;
+        background-color: rgba(225, 29, 72, 0.12);
+        color: #be123c;
     }
 </style>
